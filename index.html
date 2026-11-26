@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08090b">
+<title>FlashComm | LiFi Data Transmission</title>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>
+:root{
+  --bg:#08090b;--surface:#111316;--surface-2:#191b1f;--line:#2b2e33;
+  --text:#f7f7f5;--muted:#a6a8ad;--yellow:#ffd21f;--yellow-2:#f5b900;
+  --yellow-soft:rgba(255,210,31,.13);--green:#4ade80;--red:#fb7185;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--bg);scroll-behavior:smooth}
+body{
+  min-height:100vh;min-height:100dvh;background:
+  radial-gradient(ellipse at 85% 0%,rgba(255,210,31,.075),transparent 34%),
+  radial-gradient(ellipse at 10% 90%,rgba(255,210,31,.035),transparent 30%),var(--bg);
+  color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  padding: max(14px,env(safe-area-inset-top)) 14px max(22px,env(safe-area-inset-bottom));
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select{font:inherit}
+button{touch-action:manipulation}
+.app{width:100%;max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.header{position:relative;overflow:hidden;padding:17px 7px 12px;display:flex;align-items:center;gap:13px}
+.header:after{content:"";position:absolute;width:190px;height:100px;right:-65px;top:-24px;border:2px solid rgba(255,210,31,.24);border-left:0;border-bottom:0;border-radius:50%;transform:rotate(-16deg);filter:drop-shadow(0 0 9px rgba(255,210,31,.35));pointer-events:none}
+.brand-icon{width:54px;height:54px;display:grid;place-items:center;color:var(--yellow);flex:none}
+.brand-icon svg{width:48px;height:48px}
+.brand h1{font-size:clamp(1.5rem,6vw,2rem);letter-spacing:-.8px;font-weight:800}
+.brand h1 span{color:var(--yellow)}
+.brand p{font-size:.86rem;color:#c2c3c6;margin-top:3px}
+.tabs{display:grid;grid-template-columns:1fr 1fr 1fr;padding:5px;background:#141619;border:1px solid #303238;border-radius:19px;gap:5px}
+.tab{min-height:54px;border:0;border-radius:14px;background:transparent;color:#d4d5d7;font-weight:700;font-size:.9rem;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
+.tab svg{width:20px;height:20px}
+.tab.active{background:linear-gradient(135deg,#ffe45a,var(--yellow-2));color:#111;border:1px solid #ffe45a;box-shadow:0 5px 22px rgba(255,210,31,.17)}
+.panel{background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.012)),var(--surface);border:1px solid #292c31;border-radius:23px;padding:19px 17px;box-shadow:0 12px 32px rgba(0,0,0,.22)}
+.hidden{display:none!important}
+.hero{display:flex;flex-direction:column;align-items:center;padding:9px 0 18px;gap:13px}
+.beacon{width:132px;height:132px;border-radius:50%;display:grid;place-items:center;position:relative;background:radial-gradient(circle,rgba(255,210,31,.20),rgba(255,210,31,.035) 62%,transparent 70%);border:2px solid var(--yellow);box-shadow:0 0 0 12px rgba(255,210,31,.035),0 0 35px rgba(255,210,31,.16);color:var(--yellow);transition:.2s}
+.beacon svg{width:55px;height:55px}
+.beacon.on{background:#fff;color:#111;box-shadow:0 0 0 12px rgba(255,210,31,.08),0 0 48px rgba(255,210,31,.55)}
+.status-row{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.status{display:inline-flex;align-items:center;gap:8px;padding:8px 15px;border:1px solid rgba(255,210,31,.75);border-radius:999px;background:var(--yellow-soft);font-size:.86rem;font-weight:650;color:#fff}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--yellow);box-shadow:0 0 9px rgba(255,210,31,.65)}
+.status.sending{color:var(--yellow)}
+.status.success{border-color:rgba(74,222,128,.55);background:rgba(74,222,128,.1)}
+.status.success .dot{background:var(--green);box-shadow:0 0 9px rgba(74,222,128,.65)}
+.status.error{border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.1)}
+.status.error .dot{background:var(--red);box-shadow:0 0 9px rgba(251,113,133,.65)}
+.field{margin-top:16px}
+.label{display:flex;align-items:center;gap:9px;font-size:.96rem;font-weight:750;margin-bottom:10px}
+.label svg{width:21px;height:21px;color:var(--yellow);flex:none}
+input[type=text],select{
+  width:100%;min-height:52px;background:#1a1c20;border:1px solid #41444a;border-radius:14px;color:var(--text);
+  padding:0 15px;font-size:.96rem;outline:none;appearance:none;-webkit-appearance:none;
+}
+input[type=text]::placeholder{color:#a4a6ac}
+input[type=text]:focus,select:focus{border-color:var(--yellow);box-shadow:0 0 0 3px rgba(255,210,31,.10)}
+.char-count{text-align:right;color:var(--muted);font-size:.76rem;margin-top:6px}
+.presets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.chip{min-height:43px;border:1px solid #393c42;border-radius:999px;background:#24262a;color:#f5f5f3;font-size:.88rem;cursor:pointer}
+.chip:active{background:var(--yellow-soft);border-color:var(--yellow)}
+.settings{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.select-wrap{position:relative}
+.select-wrap:after{content:"";position:absolute;right:16px;top:20px;width:8px;height:8px;border-right:2px solid var(--text);border-bottom:2px solid var(--text);transform:rotate(45deg);pointer-events:none}
+select{padding-right:36px;font-size:.9rem}
+.range-line{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:.82rem;margin-bottom:8px}
+.range-line strong{color:var(--yellow);font-size:.9rem}
+input[type=range]{width:100%;accent-color:var(--yellow);height:24px}
+.bit-box{position:relative;background:#0c0d0f;border:1px solid #383b41;border-radius:14px;padding:13px 48px 13px 14px;min-height:59px;max-height:126px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.82rem;line-height:1.7;word-break:break-all;color:#c9cbd0}
+.bit-1{color:var(--yellow);font-weight:800}.bit-0{color:#777b83}
+.copy-btn{position:absolute;right:8px;top:8px;width:34px;height:34px;border:1px solid #41444a;border-radius:10px;background:#24262a;color:#fff;display:grid;place-items:center;cursor:pointer}
+.copy-btn svg{width:18px;height:18px}
+.actions{display:grid;grid-template-columns:.8fr 1.4fr;gap:10px;margin-top:17px}
+.btn{min-height:54px;border-radius:999px;border:1px solid #3a3d43;font-weight:750;font-size:.96rem;display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;padding:0 16px}
+.btn svg{width:20px;height:20px}
+.btn-secondary{background:#222428;color:#fff}
+.btn-primary{background:linear-gradient(135deg,#ffe45a,#ffc400);color:#111;border-color:#ffdc3d;box-shadow:0 7px 22px rgba(255,210,31,.13)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.note{margin-top:15px;padding:12px 13px;border-radius:13px;background:rgba(255,210,31,.065);border:1px solid rgba(255,210,31,.16);color:#c9cacf;font-size:.79rem;line-height:1.5}
+.torch-panel{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.torch-heading{display:flex;align-items:center;gap:12px;min-width:0}
+.torch-icon{width:48px;height:48px;color:var(--yellow);flex:none}
+.torch-heading h2{font-size:1.12rem}.torch-heading p{font-size:.82rem;color:var(--muted);margin-top:4px}
+.torch-button{min-height:48px;padding:0 16px;border-radius:999px;border:1px solid var(--yellow);background:var(--yellow-soft);color:var(--yellow);font-weight:750;white-space:nowrap;cursor:pointer}
+.torch-button:disabled{opacity:.5}
+.torch-state{text-align:center;color:var(--muted);font-size:.82rem;margin-top:13px}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#1a1c20;border:1px solid #393c42;border-radius:14px;margin-top:14px}
+.toggle-row span{font-size:.9rem;font-weight:650}
+.toggle-row input{width:20px;height:20px;accent-color:var(--yellow)}
+.log-box{background:#0c0d0f;border:1px solid #383b41;border-radius:14px;padding:12px;min-height:84px;max-height:150px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;line-height:1.6;color:#c9cbd0}
+.overlay{position:fixed;inset:0;z-index:99;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;background:#000;color:#fff}
+.overlay.active{display:flex}
+.overlay.light-on{background:#fff;color:#111}
+.overlay-card{padding:12px 16px;border-radius:13px;background:rgba(20,20,20,.82);color:#fff;font-size:.9rem;pointer-events:none}
+.overlay.light-on .overlay-card{background:rgba(20,20,20,.82);color:#fff}
+.overlay-card small{display:block;margin-top:5px;opacity:.8;font-size:.74rem}
+@media(min-width:600px){body{padding-top:26px}.panel{padding:23px}.beacon{width:145px;height:145px}}
+@media(max-width:380px){.tab{font-size:.82rem;gap:5px}.settings{gap:8px}.chip{font-size:.8rem}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="overlay" id="screenFlashOverlay" aria-live="polite">
+  <div class="overlay-card"><span id="overlayProgress">Transmitting...</span><small>Keep the receiver sensor facing the screen</small></div>
+</div>
+
+<main class="app">
+  <header class="header">
+    <div class="brand-icon" aria-hidden="true">
+      <svg viewBox="0 0 64 64" fill="none"><path d="M22 8h20l-3 25H25L22 8Z" fill="currentColor"/><path d="M25 33h14l-4 19H29l-4-19Z" fill="currentColor"/><path d="m43 8 7-5M48 20h10M17 16l-7-6" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg>
+    </div>
+    <div class="brand"><h1>Flash<span>Comm</span></h1><p>Light-Based Data Transmission + MQTT</p></div>
+  </header>
+
+  <nav class="tabs" aria-label="App sections">
+    <button class="tab active" id="txTab" onclick="switchTab('tx')" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>Transmitter
+    </button>
+    <button class="tab" id="mqttTab" onclick="switchTab('mqtt')" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>MQTT
+    </button>
+    <button class="tab" id="torchTab" onclick="switchTab('torch')" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 6H8l1-6Z"/><path d="M8 9h8l-2 12h-4L8 9Z"/><path d="M11 14h2"/></svg>Torch
+    </button>
+  </nav>
+
+  <section class="panel" id="tab-tx">
+    <div class="hero">
+      <div class="beacon" id="beacon" aria-label="Optical transmitter status">
+        <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 27h24l-3 13H23l-3-13Z"/><path d="M25 40h14l-3 17h-8l-3-17Z"/><path d="M32 5v10M14 12l6 7M50 12l-6 7"/></svg>
+      </div>
+      <div class="status-row">
+        <div class="status" id="statusPill"><span class="dot"></span><span id="statusText">Ready to Send</span></div>
+        <div class="status" id="mqttBadge"><span class="dot"></span><span id="mqttBadgeText">MQTT: Connecting...</span></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="label" for="dataInput"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H5l-3 2v-7.5A8.5 8.5 0 1 1 21 11.5Z"/><path d="M8 11h.01M12 11h.01M16 11h.01" stroke-linecap="round"/></svg>Message</label>
+      <input type="text" id="dataInput" placeholder="Enter any message..." maxlength="32" autocomplete="off" oninput="updatePreview()">
+      <div class="char-count"><span id="charCount">0</span> / 32</div>
+    </div>
+
+    <div class="field">
+      <div class="label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m13 2-3 8H5l6 12 3-9h5L13 2Z"/></svg>Quick Presets</div>
+      <div class="presets">
+        <button class="chip" type="button" onclick="setPreset('HELLO')">HELLO</button>
+        <button class="chip" type="button" onclick="setPreset('Li-Fi OK')">Li-Fi OK</button>
+        <button class="chip" type="button" onclick="setPreset('LED ON')">LED ON</button>
+        <button class="chip" type="button" onclick="setPreset('1234')">1234</button>
+      </div>
+    </div>
+
+    <div class="field settings">
+      <div>
+        <label class="label" for="outputMode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></svg>Send Method</label>
+        <div class="select-wrap"><select id="outputMode"><option value="both">Torch + Screen</option><option value="torch">Torch Only</option><option value="screen">Screen Only</option></select></div>
+      </div>
+      <div>
+        <label class="label" for="bitDuration"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2M9 2h6"/></svg>Bit Duration</label>
+        <div class="range-line"><span>Match Arduino BIT_MS</span><strong><span id="bitDurationVal">200</span> ms</strong></div>
+        <input type="range" id="bitDuration" min="50" max="250" step="10" value="200" oninput="document.getElementById('bitDurationVal').textContent=this.value">
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="label"><span style="color:var(--yellow);font-family:monospace">0101</span> Encoded ASCII Binary</div>
+      <div class="bit-box" id="bitstreamBox">Type any message above to preview its binary frame...</div>
+      <button class="copy-btn" type="button" onclick="copyBinary()" aria-label="Copy encoded binary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
+      </button>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-secondary" id="clearBtn" type="button" onclick="clearData()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Clear
+      </button>
+      <button class="btn btn-primary" id="sendBtn" type="button" onclick="sendData()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>Send Data
+      </button>
+    </div>
+    <div class="note">Type any message (up to 32 chars) or send it via MQTT. Keep <strong>Bit Duration</strong> at <strong>200 ms</strong> to match the Arduino sketch.</div>
+  </section>
+
+  <section class="panel hidden" id="tab-mqtt">
+    <div class="field" style="margin-top:0">
+      <label class="label" for="mqttBroker">Broker WebSocket URL (WSS)</label>
+      <input type="text" id="mqttBroker" value="wss://broker.hivemq.com:8884/mqtt">
+    </div>
+    <div class="field">
+      <label class="label" for="mqttTopic">Subscribe Topic (Incoming Messages)</label>
+      <input type="text" id="mqttTopic" value="yasminyasserr/flashcomm/tx">
+    </div>
+    <div class="toggle-row">
+      <span>Auto-flash when MQTT message arrives</span>
+      <input type="checkbox" id="mqttAutoFlash" checked>
+    </div>
+    <div class="actions">
+      <button class="btn btn-secondary" type="button" onclick="connectMqtt()">Reconnect</button>
+      <button class="btn btn-primary" type="button" onclick="publishMqttTest()">Publish Test ("HELLO")</button>
+    </div>
+    <div class="field">
+      <div class="label">MQTT Activity Log</div>
+      <div class="log-box" id="mqttLog">Initializing MQTT...</div>
+    </div>
+    <div class="note">Connected to HiveMQ's free public broker over secure WebSockets (<code>wss://</code>). Any text published to <strong>yasminyasserr/flashcomm/tx</strong> will flash out to your Arduino LCD.</div>
+  </section>
+
+  <section class="panel hidden" id="tab-torch">
+    <div class="torch-panel">
+      <div class="torch-heading">
+        <svg class="torch-icon" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 8h24l-3 25H23L20 8Z"/><path d="M23 33h18l-5 24H28l-5-24Z"/><path d="M49 8l6-5M53 20h8M14 16l-7-6"/></svg>
+        <div><h2>Torch Test</h2><p>Test your device flashlight</p></div>
+      </div>
+      <button class="torch-button" id="testTorchBtn" type="button" onclick="testTorch()">Turn ON</button>
+    </div>
+    <div class="torch-state" id="torchState">Torch status: Not tested</div>
+    <div class="note">Your browser may ask for camera permission. Torch access depends on your phone and browser. If the flashlight is unavailable, use Screen Only mode for transmission.</div>
+  </section>
+</main>
+
+<script>
+let videoTrack = null;
+let torchSupported = false;
+let isTransmitting = false;
+let torchBusy = false;
+let mqttClient = null;
+
+function switchTab(tab){
+  document.getElementById('tab-tx').classList.toggle('hidden', tab !== 'tx');
+  document.getElementById('tab-mqtt').classList.toggle('hidden', tab !== 'mqtt');
+  document.getElementById('tab-torch').classList.toggle('hidden', tab !== 'torch');
+  document.getElementById('txTab').classList.toggle('active', tab === 'tx');
+  document.getElementById('mqttTab').classList.toggle('active', tab === 'mqtt');
+  document.getElementById('torchTab').classList.toggle('active', tab === 'torch');
+}
+function setPreset(value){
+  const input=document.getElementById('dataInput');
+  input.value=value;updatePreview();input.focus();
+}
+function setStatus(message,type=''){
+  const pill=document.getElementById('statusPill');
+  pill.className='status '+type;
+  document.getElementById('statusText').textContent=message;
+}
+function setMqttStatus(message,type=''){
+  const badge=document.getElementById('mqttBadge');
+  badge.className='status '+type;
+  document.getElementById('mqttBadgeText').textContent=message;
+}
+function logMqtt(msg){
+  const box=document.getElementById('mqttLog');
+  const time=new Date().toLocaleTimeString();
+  box.textContent=`[${time}] ${msg}\n` + box.textContent;
+}
+function connectMqtt(){
+  const brokerUrl=document.getElementById('mqttBroker').value.trim();
+  const topic=document.getElementById('mqttTopic').value.trim();
+  if(!brokerUrl || !topic){logMqtt('Enter broker URL and topic');return;}
+  if(mqttClient){try{mqttClient.end(true);}catch(e){}}
+  setMqttStatus('MQTT: Connecting...','sending');
+  logMqtt(`Connecting to ${brokerUrl}...`);
+  try{
+    mqttClient=mqtt.connect(brokerUrl,{
+      clientId:'flashcomm_'+Math.random().toString(16).slice(2,10),
+      clean:true,
+      reconnectPeriod:4000
+    });
+    mqttClient.on('connect',()=>{
+      setMqttStatus('MQTT: Connected','success');
+      logMqtt(`Connected! Subscribing to ${topic}`);
+      mqttClient.subscribe(topic,(err)=>{
+        if(err)logMqtt('Subscribe error: '+err.message);
+        else logMqtt(`Listening on ${topic}`);
+      });
+    });
+    mqttClient.on('message',(recvTopic,payload)=>{
+      const text=payload.toString().trim().slice(0,32);
+      logMqtt(`Received on ${recvTopic}: "${text}"`);
+      if(!text)return;
+      setPreset(text);
+      if(document.getElementById('mqttAutoFlash').checked && !isTransmitting){
+        sendData();
+      }
+    });
+    mqttClient.on('error',(err)=>{
+      setMqttStatus('MQTT: Error','error');
+      logMqtt('Error: '+err.message);
+    });
+    mqttClient.on('offline',()=>{
+      setMqttStatus('MQTT: Offline','error');
+    });
+  }catch(e){
+    setMqttStatus('MQTT: Failed','error');
+    logMqtt('Connection failed: '+e.message);
+  }
+}
+function publishMqttTest(){
+  const topic=document.getElementById('mqttTopic').value.trim();
+  if(!mqttClient || !mqttClient.connected){
+    logMqtt('Not connected to MQTT broker yet.');return;
+  }
+  mqttClient.publish(topic,'HELLO');
+  logMqtt(`Published "HELLO" to ${topic}`);
+}
+function encodeTextToBits(text){
+  const bits=[];
+  // Append newline '\n' (ASCII 10) so Arduino knows the message finished
+  const fullText = text + '\n';
+  for(let i=0;i<fullText.length;i++){
+    const code=fullText.charCodeAt(i) & 0xFF;
+    bits.push(1); // Start bit (light ON)
+    for(let b=7;b>=0;b--)bits.push((code>>b)&1); // 8 data bits MSB first
+    bits.push(0); // Stop bit (light OFF)
+  }
+  return bits;
+}
+function updatePreview(activeIndex=-1){
+  const text=document.getElementById('dataInput').value;
+  document.getElementById('charCount').textContent=text.length;
+  const box=document.getElementById('bitstreamBox');
+  if(!text){box.textContent='Type any message above to preview its binary frame...';return;}
+  const bits=encodeTextToBits(text);
+  box.innerHTML=bits.map((bit,index)=>{
+    const span=document.createElement('span');
+    span.className=(bit===1?'bit-1':'bit-0')+(index===activeIndex?' bit-active':'');
+    span.textContent=bit;
+    return span.outerHTML;
+  }).join('');
+}
+async function copyBinary(){
+  const text=document.getElementById('dataInput').value;
+  if(!text){setStatus('Nothing to copy','error');return;}
+  const binary=encodeTextToBits(text).join('');
+  try{
+    await navigator.clipboard.writeText(binary);
+    setStatus('Binary copied','success');
+  }catch(e){
+    setStatus('Copy unavailable in this browser','error');
+  }
+}
+async function initTorch(){
+  if(videoTrack)return torchSupported;
+  const badge=document.getElementById('torchState');
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    badge.textContent='Torch unavailable in this browser';
+    return false;
+  }
+  let stream;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'}}});
+    videoTrack=stream.getVideoTracks()[0];
+    const capabilities=videoTrack.getCapabilities?videoTrack.getCapabilities():{};
+    torchSupported=!!capabilities.torch;
+    if(torchSupported)badge.textContent='Torch status: Ready';
+    else{
+      badge.textContent='Torch control not supported on this device';
+      stream.getTracks().forEach(track=>track.stop());
+      videoTrack=null;
+    }
+  }catch(error){
+    badge.textContent='Camera permission denied or unavailable';
+    torchSupported=false;videoTrack=null;
+  }
+  return torchSupported;
+}
+async function setLightState(on,useTorch,useScreen){
+  document.getElementById('beacon').classList.toggle('on',on);
+  if(useScreen){
+    const overlay=document.getElementById('screenFlashOverlay');
+    overlay.classList.toggle('light-on',on);
+    overlay.classList.toggle('active',true);
+  }
+  if(useTorch&&torchSupported&&videoTrack){
+    try{await videoTrack.applyConstraints({advanced:[{torch:on}]});}
+    catch(error){}
+  }
+}
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+
+async function testTorch(){
+  if(isTransmitting||torchBusy)return;
+  torchBusy=true;
+  const button=document.getElementById('testTorchBtn');
+  button.disabled=true;
+  const supported=await initTorch();
+  if(!supported){
+    document.getElementById('torchState').textContent='Torch unavailable. Try Screen Only mode.';
+    setStatus('Torch unavailable','error');
+    button.disabled=false;torchBusy=false;return;
+  }
+  try{
+    await videoTrack.applyConstraints({advanced:[{torch:true}]});
+    button.textContent='Turn OFF';
+    document.getElementById('torchState').textContent='Torch status: ON';
+    await sleep(900);
+    await videoTrack.applyConstraints({advanced:[{torch:false}]});
+    button.textContent='Turn ON';
+    document.getElementById('torchState').textContent='Torch test complete';
+    setStatus('Torch test complete','success');
+  }catch(error){
+    document.getElementById('torchState').textContent='Could not control the flashlight';
+    setStatus('Torch test failed','error');
+  }
+  button.disabled=false;torchBusy=false;
+}
+async function sendData(){
+  if(isTransmitting)return;
+  const text=document.getElementById('dataInput').value;
+  if(!text.trim()){setStatus('Enter a message first','error');return;}
+  const mode=document.getElementById('outputMode').value;
+  const useTorch=mode==='both'||mode==='torch';
+  const useScreen=mode==='both'||mode==='screen';
+  const bitDuration=parseInt(document.getElementById('bitDuration').value,10);
+
+  if(useTorch)await initTorch();
+  if(mode==='torch'&&!torchSupported){
+    setStatus('Torch unavailable — choose Screen Only','error');return;
+  }
+  if(mode==='both'&&!torchSupported){
+    setStatus('Using screen only (torch unavailable)','sending');
+  }
+
+  const actualTorch=useTorch&&torchSupported&&!!videoTrack;
+  const bits=encodeTextToBits(text);
+  isTransmitting=true;
+  document.getElementById('sendBtn').disabled=true;
+  document.getElementById('clearBtn').disabled=true;
+  document.getElementById('testTorchBtn').disabled=true;
+  const overlay=document.getElementById('screenFlashOverlay');
+  const progress=document.getElementById('overlayProgress');
+
+  if(useScreen){
+    overlay.classList.add('active');
+    overlay.classList.remove('light-on');
+  }
+  setStatus('Sending data...','sending');
+  try{
+    await setLightState(false,actualTorch,useScreen);
+    await sleep(bitDuration*3);
+    for(let i=0;i<bits.length;i++){
+      updatePreview(i);
+      if(useScreen)progress.textContent=`Sending bit ${i+1} / ${bits.length} (${bits[i]})`;
+      await setLightState(bits[i]===1,actualTorch,useScreen);
+      await sleep(bitDuration);
+    }
+    await setLightState(false,actualTorch,useScreen);
+    updatePreview(-1);
+    setStatus('Data sent successfully','success');
+    if(mqttClient && mqttClient.connected){
+      const baseTopic=document.getElementById('mqttTopic').value.trim().replace(/\/tx$/,'');
+      mqttClient.publish(baseTopic+'/status','SENT: '+text);
+    }
+  }catch(error){
+    setStatus('Transmission interrupted','error');
+  }finally{
+    if(useScreen)overlay.classList.remove('active','light-on');
+    document.getElementById('beacon').classList.remove('on');
+    isTransmitting=false;
+    document.getElementById('sendBtn').disabled=false;
+    document.getElementById('clearBtn').disabled=false;
+    document.getElementById('testTorchBtn').disabled=false;
+  }
+}
+function clearData(){
+  if(isTransmitting)return;
+  document.getElementById('dataInput').value='';
+  updatePreview();
+  setStatus('Ready to Send');
+}
+window.addEventListener('DOMContentLoaded', connectMqtt);
+</script>
+</body>
+</html>
+```[cite: 3]
